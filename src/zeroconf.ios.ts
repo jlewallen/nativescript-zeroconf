@@ -39,6 +39,7 @@ export class Zeroconf extends Common {
 
     this.netServiceBrowser.delegate = MyNSNetServiceBrowserDelegate.new().initWithCallback((result) => {
       if (result.type === 'service') {
+        console.log('service', result.data.name, result.data.type);
         if (result.removed) {
           let service:ZeroconfService = {
               'name' : result.name,
@@ -71,21 +72,24 @@ export class Zeroconf extends Common {
      Internal method that resolves a Bonjour service that was found
   */
   private resolveBonjourService(result:NSNetService) : void {
-
     /* add delegate - see MyNSNetServiceDelegate class definition below in file */
-
+    console.log("resolving", result.name, result.type);
     result.delegate = MyNSNetServiceDelegate.new().initWithCallback((result) => {
-      if (result.type === 'resolve') { this.processBonjourService(result.data); }
+      if (result.type === 'resolve') {
+        this.processBonjourService(result.data);
+      }
     });
 
-    result.resolveWithTimeout(0.0); // value of 0.0 indicates no timeout and a resolve process of indefinite duration
+    result.resolveWithTimeout(10.0);
   }
 
   /*
      Internal method that processes a resolved Bonjour service and adds it to knownDevices
   */
   private processBonjourService(result:NSNetService) : void {
-    if (result.addresses.count<1) { console.warn(`processBonjourService: did not resolve any IP addresses for ${result.name}!`); }
+    if (result.addresses.count < 1) {
+        console.warn(`processBonjourService: did not resolve any IP addresses for ${result.name}!`);
+    }
 
     let service:ZeroconfService = {
       'name' : result.name,
@@ -116,7 +120,7 @@ class MyNSNetServiceBrowserDelegate extends NSObject implements NSNetServiceBrow
   }
 
   public netServiceBrowserDidFindDomainMoreComing(browser: NSNetServiceBrowser, domainString: string, moreComing: boolean) {
-    // console.log(`netServiceBrowserDidFindDomainMoreComing: ${domainString}`);
+    console.log(`netServiceBrowserDidFindDomainMoreComing: ${domainString}`);
     this._callback({
       'type': 'domain',
       'data': domainString,
@@ -125,11 +129,11 @@ class MyNSNetServiceBrowserDelegate extends NSObject implements NSNetServiceBrow
   }
 
   public netServiceBrowserWillSearch(browser:NSNetServiceBrowser) {
-    // console.log(`netServiceBrowserWillSearch`);
+    console.log(`netServiceBrowserWillSearch`);
   }
 
   public netServiceBrowserDidStopSearch(browser:NSNetServiceBrowser) {
-    // console.log(`netServiceBrowserDidStopSearch`);
+    console.log(`netServiceBrowserDidStopSearch`);
   }
 
   public netServiceBrowserDidFindServiceMoreComing(browser:NSNetServiceBrowser, service:NSNetService, moreComing:boolean) {
@@ -170,15 +174,15 @@ class MyNSNetServiceDelegate extends NSObject implements NSNetServiceDelegate {
   }
 
   public netServiceWillResolve(sender: NSNetService) {
-    // console.log(`netServiceWillResolve`);
+    console.log(`netServiceWillResolve ${sender.name} ${sender.type}`);
   }
 
   public netServiceDidNotResolve(sender: NSNetService, errorDict: NSDictionary<string, number>) {
-    console.log(`netServiceDidNotResolve`);
+    console.log(`netServiceDidNotResolve ${sender.name} ${sender.type}`);
   }
 
   public netServiceDidResolveAddress(sender: NSNetService) {
-    // console.log('netServiceDidResolveAddress');
+    console.log(`netServiceDidResolveAddress ${sender.name} ${sender.type}`);
     this._callback({
       'type' : 'resolve',
       'data' : sender
