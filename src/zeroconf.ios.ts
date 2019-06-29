@@ -9,6 +9,7 @@ import { ZeroconfService, Common } from './zeroconf.common';
  * bottom of things.
  */
 let delegate = null;
+let services: Array<any> = [];
 
 export class Zeroconf extends Common {
   private netServiceBrowser:NSNetServiceBrowser;
@@ -37,13 +38,13 @@ export class Zeroconf extends Common {
 
     /* add delegate - see MyNSNetServiceBrowserDelegate class definition below in file */
 
-    this.netServiceBrowser.delegate = MyNSNetServiceBrowserDelegate.new().initWithCallback((result) => {
+    delegate = MyNSNetServiceBrowserDelegate.new().initWithCallback((result) => {
       if (result.type === 'service') {
         console.log('service', result.data.name, result.data.type);
         if (result.removed) {
           let service:ZeroconfService = {
-              'name' : result.name,
-              'type' : result.type,
+              'name' : result.data.name,
+              'type' : result.data.type,
           }
 
           this.onServiceLost(service);
@@ -52,7 +53,12 @@ export class Zeroconf extends Common {
           this.resolveBonjourService(result.data);
         }
       }
+      if (result.type === 'resolve') {
+        this.processBonjourService(result.data);
+      }
     });
+
+    this.netServiceBrowser.delegate = delegate;
 
     this.netServiceBrowser.searchForServicesOfTypeInDomain(this.serviceType, 'local.');
   }
@@ -74,12 +80,15 @@ export class Zeroconf extends Common {
   private resolveBonjourService(result:NSNetService) : void {
     /* add delegate - see MyNSNetServiceDelegate class definition below in file */
     console.log("resolving", result.name, result.type);
+    /*
     result.delegate = MyNSNetServiceDelegate.new().initWithCallback((result) => {
       if (result.type === 'resolve') {
         this.processBonjourService(result.data);
       }
     });
-
+    */
+    result.delegate = delegate;
+    result.stop();
     result.resolveWithTimeout(10.0);
   }
 
@@ -104,8 +113,8 @@ export class Zeroconf extends Common {
 
 /* Define NSNetServiceBrowserDelegate implementation class */
 
-class MyNSNetServiceBrowserDelegate extends NSObject implements NSNetServiceBrowserDelegate {
-  public static ObjCProtocols = [NSNetServiceBrowserDelegate];
+class MyNSNetServiceBrowserDelegate extends NSObject implements NSNetServiceBrowserDelegate, NSNetServiceDelegate {
+  public static ObjCProtocols = [NSNetServiceBrowserDelegate, NSNetServiceDelegate];
 
   static new(): MyNSNetServiceBrowserDelegate {
     return <MyNSNetServiceBrowserDelegate>super.new();
@@ -115,7 +124,6 @@ class MyNSNetServiceBrowserDelegate extends NSObject implements NSNetServiceBrow
 
   public initWithCallback(callback: (result:any) => void): MyNSNetServiceBrowserDelegate {
     this._callback = callback;
-    delegate = this;
     return this;
   }
 
@@ -138,12 +146,18 @@ class MyNSNetServiceBrowserDelegate extends NSObject implements NSNetServiceBrow
 
   public netServiceBrowserDidFindServiceMoreComing(browser:NSNetServiceBrowser, service:NSNetService, moreComing:boolean) {
     console.log(`netServiceBrowserDidFindServiceMoreComing, found service ${service.name} ${service.type}`);
+    /*
     this._callback({
       'removed': false,
       'type': 'service',
       'data': service,
       'moreComing': moreComing
     });
+    */
+    service.retain();
+    service.delegate = this;
+    service.stop();
+    service.resolveWithTimeout(10.0);
   }
 
   public netServiceBrowserDidRemoveServiceMoreComing(browser:NSNetServiceBrowser, service:NSNetService, moreComing:boolean) {
@@ -154,23 +168,6 @@ class MyNSNetServiceBrowserDelegate extends NSObject implements NSNetServiceBrow
       'data': service,
       'moreComing': moreComing
     });
-  }
-}
-
-/* Define NSNetServiceDelegate implementation class for resolving host/port once service was discovered */
-
-class MyNSNetServiceDelegate extends NSObject implements NSNetServiceDelegate {
-  public static ObjCProtocols = [NSNetServiceDelegate];
-
-  static new(): MyNSNetServiceDelegate {
-    return <MyNSNetServiceDelegate>super.new();
-  }
-
-  private _callback: (result:any) => void;
-
-  public initWithCallback(callback: (result:any) => void): MyNSNetServiceDelegate {
-    this._callback = callback;
-    return this;
   }
 
   public netServiceWillResolve(sender: NSNetService) {
@@ -189,3 +186,4 @@ class MyNSNetServiceDelegate extends NSObject implements NSNetServiceDelegate {
     });
   }
 }
+
